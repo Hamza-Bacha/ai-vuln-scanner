@@ -1,0 +1,20 @@
+title: Vulnerability scanner user agent seen
+id: 9cad6d35-e320-50ec-ba55-6c62c0918aa0
+status: experimental
+description: Web requests from known vulnerability scanners (Nuclei or this tool).
+author: ai-vuln-scanner
+date: 2026-11-20
+tags:
+    - attack.reconnaissance
+    - attack.t1595.002
+logsource:
+    category: webserver
+detection:
+    selection:
+        cs-user-agent|contains:
+            - 'Nuclei'
+            - 'ai-vuln-scanner'
+    condition: selection
+falsepositives:
+    - Legitimate use of this path by administrators
+level: medium

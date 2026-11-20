@@ -1,0 +1,19 @@
+title: Access to exposed Prometheus metrics endpoint
+id: e7d4dda5-1c3e-5880-a058-356e8f3ec7ac
+status: experimental
+description: Requests to /metrics, which a scan found publicly exposed.
+author: ai-vuln-scanner
+date: 2026-11-20
+tags:
+    - attack.reconnaissance
+    - attack.t1595.002
+logsource:
+    category: webserver
+detection:
+    selection:
+        c-uri|startswith:
+            - '/metrics'
+    condition: selection
+falsepositives:
+    - Legitimate use of this path by administrators
+level: medium
