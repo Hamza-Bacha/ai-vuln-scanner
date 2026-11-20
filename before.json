@@ -1,0 +1,44 @@
+[
+  {
+    "id": "hdr-strict-transport-security",
+    "title": "Missing header: Strict-Transport-Security",
+    "severity": "medium",
+    "evidence": "Forces HTTPS; protects against downgrade attacks.",
+    "location": "http://localhost:3000"
+  },
+  {
+    "id": "hdr-content-security-policy",
+    "title": "Missing header: Content-Security-Policy",
+    "severity": "medium",
+    "evidence": "Mitigates XSS and data injection.",
+    "location": "http://localhost:3000"
+  },
+  {
+    "id": "hdr-referrer-policy",
+    "title": "Missing header: Referrer-Policy",
+    "severity": "low",
+    "evidence": "Limits referrer information leakage.",
+    "location": "http://localhost:3000"
+  },
+  {
+    "id": "tls-none",
+    "title": "Site not served over HTTPS",
+    "severity": "medium",
+    "evidence": "Target uses plain HTTP",
+    "location": "http://localhost:3000"
+  },
+  {
+    "id": "exposed/ftp",
+    "title": "Exposed path: /ftp",
+    "severity": "high",
+    "evidence": "HTTP 200, starts with: \"<!DOCTYPE html>\\n<html>\\n  <head>\\n    <meta charset='utf-8'> \\n\"",
+    "location": "http://localhost:3000/ftp"
+  },
+  {
+    "id": "nuclei-prometheus-metrics",
+    "title": "Prometheus Metrics - Detect",
+    "severity": "medium",
+    "evidence": "Prometheus metrics page was detected.",
+    "location": "http://localhost:3000/metrics"
+  }
+]

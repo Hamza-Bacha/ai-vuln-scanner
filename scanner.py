@@ -1,5 +1,5 @@
 """
-Quick scanner (MVP step 1): security headers, cookies, TLS, exposed files.
+Quick scanner: security headers, cookies, TLS, exposed files, optional Nuclei.
 Run ONLY against targets you own or have written permission to test
 (e.g. OWASP Juice Shop at http://localhost:3000).
 """
@@ -23,9 +23,11 @@ SECURITY_HEADERS = {
 
 SENSITIVE_PATHS = ["/.git/HEAD", "/.env", "/backup.zip", "/server-status", "/.DS_Store", "/ftp"]
 
+
 def finding(fid, title, severity, evidence, location):
     return {"id": fid, "title": title, "severity": severity,
             "evidence": evidence, "location": location}
+
 
 async def check_headers(client, url):
     findings = []
@@ -44,6 +46,7 @@ async def check_headers(client, url):
             findings.append(finding("cookie-flags", "Cookie missing security flags", "low",
                                     f"{cookie.split('=')[0]} lacks: {', '.join(missing)}", url))
     return findings
+
 
 async def check_tls(url):
     parsed = urlparse(url)
@@ -70,6 +73,7 @@ async def check_tls(url):
         findings.append(finding("tls-error", "TLS problem", "high", str(e), url))
     return findings
 
+
 async def check_paths(client, base, sem):
     # Baseline: what does this site return for a page that cannot exist?
     try:
@@ -92,14 +96,16 @@ async def check_paths(client, base, sem):
                 return None
             return finding(f"exposed{path}", f"Exposed path: {path}", "high",
                            f"HTTP 200, starts with: {body[:60]!r}", urljoin(base, path))
+
     results = await asyncio.gather(*(probe(p) for p in SENSITIVE_PATHS))
     return [x for x in results if x]
 
 
-async def run_nuclei(url):
+async def run_nuclei(url, timeout=300):
     cmd = ["nuclei", "-u", url, "-jsonl", "-silent", "-no-color",
+           "-t", "http/exposures", "-t", "http/misconfiguration",
            "-severity", "low,medium,high,critical",
-           "-tags", "exposure,misconfig,tech",
+           "-rl", "20", "-c", "10", "-ni",
            "-exclude-tags", "dos,fuzz,intrusive"]
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -107,28 +113,30 @@ async def run_nuclei(url):
     except FileNotFoundError:
         print("Nuclei is not installed, skipping.")
         return []
-    try:
-        out, _ = await asyncio.wait_for(proc.communicate(), timeout=600)
-    except asyncio.TimeoutError:
-        proc.kill()
-        print("Nuclei timed out after 10 minutes, skipping.")
-        return []
+
     findings = []
-    for line in out.decode(errors="ignore").splitlines():
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        info = item.get("info", {})
-        findings.append(finding(
-            f"nuclei-{item.get('template-id', 'unknown')}",
-            info.get("name", "Nuclei finding"),
-            info.get("severity", "info"),
-            (info.get("description") or "Matched Nuclei template").strip()[:300],
-            item.get("matched-at", url)))
+
+    async def read_lines():
+        async for raw in proc.stdout:
+            try:
+                item = json.loads(raw.decode(errors="ignore"))
+            except json.JSONDecodeError:
+                continue
+            info = item.get("info", {})
+            findings.append(finding(
+                f"nuclei-{item.get('template-id', 'unknown')}",
+                info.get("name", "Nuclei finding"),
+                info.get("severity", "info"),
+                (info.get("description") or "Matched Nuclei template").strip()[:300],
+                item.get("matched-at", url)))
+
+    try:
+        await asyncio.wait_for(read_lines(), timeout=timeout)
+    except asyncio.TimeoutError:
+        print("Nuclei hit the time limit, keeping partial results.")
+        proc.kill()
+    await proc.wait()
     return findings
-
-
 async def quick_scan(url):
     sem = asyncio.Semaphore(5)
     async with httpx.AsyncClient(timeout=10, follow_redirects=True,
@@ -136,6 +144,7 @@ async def quick_scan(url):
         parts = await asyncio.gather(check_headers(client, url), check_tls(url),
                                      check_paths(client, url, sem))
     return [f for part in parts for f in part]
+
 
 def authorization_gate(url):
     host = urlparse(url).hostname
@@ -145,11 +154,13 @@ def authorization_gate(url):
     ans = input("Do you own this target or have WRITTEN permission to test it? (yes/no): ")
     return ans.strip().lower() == "yes"
 
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("url", help="e.g. http://localhost:3000")
     ap.add_argument("--no-ai", action="store_true", help="skip AI analysis")
     ap.add_argument("--nuclei", action="store_true", help="also run Nuclei (slower)")
+    ap.add_argument("--out", default="scan_results.json", help="output JSON file")
     args = ap.parse_args()
 
     if not authorization_gate(args.url):
@@ -158,9 +169,10 @@ def main():
     findings = asyncio.run(quick_scan(args.url))
     if args.nuclei:
         findings += asyncio.run(run_nuclei(args.url))
-    with open("scan_results.json", "w") as f:
+
+    with open(args.out, "w") as f:
         json.dump(findings, f, indent=2)
-    print(f"{len(findings)} findings saved to scan_results.json")
+    print(f"{len(findings)} findings saved to {args.out}")
 
     if not args.no_ai:
         from ai_analyze import analyze
@@ -168,6 +180,7 @@ def main():
         with open("report.md", "w") as f:
             f.write(report)
         print("AI report saved to report.md")
+
 
 if __name__ == "__main__":
     main()

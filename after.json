@@ -1,0 +1,16 @@
+[
+  {
+    "id": "hdr-strict-transport-security",
+    "title": "Missing header: Strict-Transport-Security",
+    "severity": "medium",
+    "evidence": "Forces HTTPS; protects against downgrade attacks.",
+    "location": "http://localhost:8080"
+  },
+  {
+    "id": "tls-none",
+    "title": "Site not served over HTTPS",
+    "severity": "medium",
+    "evidence": "Target uses plain HTTP",
+    "location": "http://localhost:8080"
+  }
+]
