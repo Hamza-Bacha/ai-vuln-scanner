@@ -1,7 +1,7 @@
 title: Access to exposed /ftp directory
 id: aaab5f75-bed0-5216-909e-e8ede28a6c31
 status: experimental
-description: Requests to the /ftp directory, which a scan found publicly exposed.
+description: "Requests to the /ftp directory, which a scan found publicly exposed."
 author: ai-vuln-scanner
 date: 2026-11-20
 tags:

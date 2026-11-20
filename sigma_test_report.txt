@@ -1,0 +1,14 @@
+Log lines parsed: 3705
+
+[PASS] Access to exposed /ftp directory  (34 matching requests)
+        example: GET /ftp -> 403
+[PASS] High request rate from one client (possible scanner)
+        peak 1211 requests in 1m from one client (threshold 300)
+[PASS] Access to exposed Prometheus metrics endpoint  (6 matching requests)
+        example: GET /metrics -> 403
+[PASS] Nuclei template probe path  (204 matching requests)
+        example: GET /nuclei.svg?bwSlZ=x -> 200
+[PASS] Known scanner user agent seen  (8 matching requests)
+        example: GET /zz-not-real-9f3a1c -> 200
+
+5 of 5 rules fired on real traffic.

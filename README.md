@@ -30,3 +30,20 @@ My first version flagged `/server-status` on Juice Shop as exposed. It was a fal
 
 ## Detection rules (SOC side)
 `sigma_gen.py` turns findings into Sigma rules for web server logs, tagged with MITRE ATT&CK techniques. Only findings that leave a trace in logs get a rule: in my Juice Shop test, 2 of 6 findings did, plus one rule that detects scanner traffic. Missing-header and HTTPS findings are configuration issues, so the tool reports them as "no log-based rule" instead of inventing a weak one.
+### Rule testing
+`sigma_test.py` replays a web access log against the generated rules. I ran my scanner and Nuclei through a logging proxy in front of OWASP Juice Shop (3,705 requests). All 5 rules fired:
+
+| Rule | Result |
+|---|---|
+| Exposed /ftp access | 34 matching requests |
+| Exposed /metrics access | 6 matching requests |
+| Nuclei template probe path | 204 matching requests |
+| Known scanner user agent | 8 matching requests (my own tool) |
+| High request rate (300+/min from one client) | peak of 1,211 requests in one minute |
+
+**What I learned:** my first scanner rule looked for "Nuclei" in the user agent and could never match, because Nuclei rotates browser user agents. A behavior-based rule (request rate) catches it even when it hides its name.
+
+**Limitations:**
+- All traffic came from one machine (my laptop), so this proves the pipeline works, not that the rules catch every real attacker.
+- The 300 requests/minute threshold was not tested against normal visitors and needs tuning before real use.
+- The Nuclei path rule depends on a template and can break when templates change.

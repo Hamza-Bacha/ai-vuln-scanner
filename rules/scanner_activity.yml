@@ -1,7 +1,7 @@
-title: Vulnerability scanner user agent seen
+title: Known scanner user agent seen
 id: 9cad6d35-e320-50ec-ba55-6c62c0918aa0
 status: experimental
-description: Web requests from known vulnerability scanners (Nuclei or this tool).
+description: "Requests from scanners that announce themselves (this tool, sqlmap, Nikto, Nmap, gobuster, wfuzz). Nuclei rotates browser user agents, so it is NOT caught here."
 author: ai-vuln-scanner
 date: 2026-11-20
 tags:
@@ -12,8 +12,12 @@ logsource:
 detection:
     selection:
         cs-user-agent|contains:
-            - 'Nuclei'
             - 'ai-vuln-scanner'
+            - 'sqlmap'
+            - 'nikto'
+            - 'nmap scripting engine'
+            - 'gobuster'
+            - 'wfuzz'
     condition: selection
 falsepositives:
     - Legitimate use of this path by administrators

@@ -1,0 +1,14 @@
+title: Any web request (helper for the rate rule)
+name: all_web_requests
+id: ffc7e484-fb7f-5c42-bacc-34aa1a46bb69
+status: experimental
+description: Helper rule used by the request-rate correlation rule.
+author: ai-vuln-scanner
+date: 2026-11-20
+logsource:
+    category: webserver
+detection:
+    selection:
+        c-uri|startswith: '/'
+    condition: selection
+level: informational

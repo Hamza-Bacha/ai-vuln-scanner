@@ -1,0 +1,19 @@
+title: Nuclei template probe path
+id: 0fb6d447-3489-59e8-b889-880bea96b305
+status: experimental
+description: "Request for /nuclei.svg, a path requested by a Nuclei template (seen in my lab logs). Fragile: template changes can break it."
+author: ai-vuln-scanner
+date: 2026-11-20
+tags:
+    - attack.reconnaissance
+    - attack.t1595.002
+logsource:
+    category: webserver
+detection:
+    selection:
+        c-uri|contains:
+            - '/nuclei.svg'
+    condition: selection
+falsepositives:
+    - Legitimate use of this path by administrators
+level: medium

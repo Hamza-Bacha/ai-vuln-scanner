@@ -48,12 +48,25 @@ RULES = {
         ["attack.discovery", "attack.t1083"], "low"),
 }
 
-# Always generated: detects the scanners themselves
+# Always generated rules (they do not depend on a specific finding)
+# Honest user-agent rule: only catches scanners that announce themselves.
 SCANNER_RULE = (
-    "Vulnerability scanner user agent seen",
-    "Web requests from known vulnerability scanners (Nuclei or this tool).",
-    "cs-user-agent|contains", ["Nuclei", "ai-vuln-scanner"],
+    "Known scanner user agent seen",
+    "Requests from scanners that announce themselves (this tool, sqlmap, Nikto, Nmap, gobuster, wfuzz). Nuclei rotates browser user agents, so it is NOT caught here.",
+    "cs-user-agent|contains",
+    ["ai-vuln-scanner", "sqlmap", "nikto", "nmap scripting engine", "gobuster", "wfuzz"],
     ["attack.reconnaissance", "attack.t1595.002"], "medium")
+
+# Fragile but real: a path requested by a Nuclei template during testing.
+NUCLEI_PROBE = (
+    "Nuclei template probe path",
+    "Request for /nuclei.svg, a path requested by a Nuclei template (seen in my lab logs). Fragile: template changes can break it.",
+    "c-uri|contains", ["/nuclei.svg"],
+    ["attack.reconnaissance", "attack.t1595.002"], "medium")
+
+ALWAYS = {"scanner-activity": SCANNER_RULE, "nuclei-probe": NUCLEI_PROBE}
+
+RATE_THRESHOLD = 300  # requests per minute from one client; tune for your site
 
 NAMESPACE = uuid.UUID("12345678-1234-5678-1234-567812345678")
 
@@ -64,7 +77,7 @@ def build_rule(rule_id, spec):
         f"title: {title}",
         f"id: {uuid.uuid5(NAMESPACE, rule_id)}",
         "status: experimental",
-        f"description: {desc}",
+        f'description: "{desc}"',
         "author: ai-vuln-scanner",
         f"date: {date.today():%Y-%m-%d}",
         "tags:",
@@ -81,6 +94,48 @@ def build_rule(rule_id, spec):
         f"level: {level}",
     ]
     return "\n".join(lines) + "\n"
+
+
+def build_rate_rules():
+    today = f"{date.today():%Y-%m-%d}"
+    base = f"""title: Any web request (helper for the rate rule)
+name: all_web_requests
+id: {uuid.uuid5(NAMESPACE, "all-web-requests")}
+status: experimental
+description: Helper rule used by the request-rate correlation rule.
+author: ai-vuln-scanner
+date: {today}
+logsource:
+    category: webserver
+detection:
+    selection:
+        c-uri|startswith: '/'
+    condition: selection
+level: informational
+"""
+    corr = f"""title: High request rate from one client (possible scanner)
+id: {uuid.uuid5(NAMESPACE, "high-request-rate")}
+status: experimental
+description: One client sent a very high number of requests in a minute. Works even when a scanner hides its user agent.
+author: ai-vuln-scanner
+date: {today}
+tags:
+    - attack.reconnaissance
+    - attack.t1595.002
+correlation:
+    type: event_count
+    rules:
+        - all_web_requests
+    group-by:
+        - c-ip
+    timespan: 1m
+    condition:
+        gte: {RATE_THRESHOLD}
+falsepositives:
+    - Load tests, busy search engine crawlers
+level: high
+"""
+    return base, corr
 
 
 def safe_name(rule_id):
@@ -105,10 +160,19 @@ def main():
         else:
             skipped.append(item["title"])
 
-    path = os.path.join("rules", "scanner_activity.yml")
+    for rid, spec in ALWAYS.items():
+        path = os.path.join("rules", rid.replace("-", "_") + ".yml")
+        with open(path, "w") as out:
+            out.write(build_rule(rid, spec))
+        made.append((spec[0] + " (always generated)", path))
+
+    base, corr = build_rate_rules()
+    with open(os.path.join("rules", "all_web_requests.yml"), "w") as out:
+        out.write(base)
+    path = os.path.join("rules", "high_request_rate.yml")
     with open(path, "w") as out:
-        out.write(build_rule("scanner-activity", SCANNER_RULE))
-    made.append(("Scanner activity (always generated)", path))
+        out.write(corr)
+    made.append(("High request rate from one client (always generated)", path))
 
     print(f"Rules written: {len(made)}")
     for title, path in made:
