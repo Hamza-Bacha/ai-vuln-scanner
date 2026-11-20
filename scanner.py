@@ -96,6 +96,39 @@ async def check_paths(client, base, sem):
     return [x for x in results if x]
 
 
+async def run_nuclei(url):
+    cmd = ["nuclei", "-u", url, "-jsonl", "-silent", "-no-color",
+           "-severity", "low,medium,high,critical",
+           "-tags", "exposure,misconfig,tech",
+           "-exclude-tags", "dos,fuzz,intrusive"]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    except FileNotFoundError:
+        print("Nuclei is not installed, skipping.")
+        return []
+    try:
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=600)
+    except asyncio.TimeoutError:
+        proc.kill()
+        print("Nuclei timed out after 10 minutes, skipping.")
+        return []
+    findings = []
+    for line in out.decode(errors="ignore").splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        info = item.get("info", {})
+        findings.append(finding(
+            f"nuclei-{item.get('template-id', 'unknown')}",
+            info.get("name", "Nuclei finding"),
+            info.get("severity", "info"),
+            (info.get("description") or "Matched Nuclei template").strip()[:300],
+            item.get("matched-at", url)))
+    return findings
+
+
 async def quick_scan(url):
     sem = asyncio.Semaphore(5)
     async with httpx.AsyncClient(timeout=10, follow_redirects=True,
@@ -116,12 +149,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("url", help="e.g. http://localhost:3000")
     ap.add_argument("--no-ai", action="store_true", help="skip AI analysis")
+    ap.add_argument("--nuclei", action="store_true", help="also run Nuclei (slower)")
     args = ap.parse_args()
 
     if not authorization_gate(args.url):
         raise SystemExit("Refusing to scan without authorization.")
 
     findings = asyncio.run(quick_scan(args.url))
+    if args.nuclei:
+        findings += asyncio.run(run_nuclei(args.url))
     with open("scan_results.json", "w") as f:
         json.dump(findings, f, indent=2)
     print(f"{len(findings)} findings saved to scan_results.json")
