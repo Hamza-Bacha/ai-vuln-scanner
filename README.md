@@ -27,3 +27,6 @@ My first version flagged `/server-status` on Juice Shop as exposed. It was a fal
 - [ ] Fix, then re-scan verification
 - [ ] Sigma detection rule per finding
 - [ ] HTML/PDF report and benchmarks
+
+## Detection rules (SOC side)
+`sigma_gen.py` turns findings into Sigma rules for web server logs, tagged with MITRE ATT&CK techniques. Only findings that leave a trace in logs get a rule: in my Juice Shop test, 2 of 6 findings did, plus one rule that detects scanner traffic. Missing-header and HTTPS findings are configuration issues, so the tool reports them as "no log-based rule" instead of inventing a weak one.
