@@ -1,0 +1,52 @@
+# AI Vulnerability Scanner (MVP)
+
+Quick web security scanner with AI-written triage and fix suggestions.
+
+**Only scan targets you own or have written permission to test.**
+
+## What it checks
+- Missing security headers
+- Cookie flags
+- HTTPS and TLS issues
+- Exposed files and folders (with false-positive filtering)
+
+## Run it
+    pip install -r requirements.txt
+    docker run -d -p 3000:3000 bkimminich/juice-shop
+o
+    python scanner.py http://localhost:3000 --no-ai
+    python scanner.py http://localhost:3000 --no-ai --nuclei
+See `sample_report.md` for example AI output.
+
+## Lessons learned
+My first version flagged `/server-status` on Juice Shop as exposed. It was a false positive, because the app returns its home page for unknown URLs. I fixed it by comparing each result against a baseline "page that cannot exist" response.
+
+## Roadmap
+- [x] Headers, cookies, TLS, exposed paths
+- [x] AI triage and fix suggestions
+- [x] Nuclei integration
+- [ ] Fix, then re-scan verification
+- [ ] Sigma detection rule per finding
+- [ ] HTML/PDF report and benchmarks
+
+## Detection rules (SOC side)
+`sigma_gen.py` turns findings into Sigma rules for web server logs, tagged with MITRE ATT&CK techniques. Only findings that leave a trace in logs get a rule: in my Juice Shop test, 2 of 6 findings did, plus one rule that detects scanner traffic. Missing-header and HTTPS findings are configuration issues, so the tool reports them as "no log-based rule" instead of inventing a weak one.
+### Rule testing
+`sigma_test.py` replays a web access log against the generated rules. I ran my scanner and Nuclei through a logging proxy in front of OWASP Juice Shop (3,705 requests). All 5 rules fired:
+
+| Rule | Result |
+|---|---|
+| Exposed /ftp access | 34 matching requests |
+| Exposed /metrics access | 6 matching requests |
+| Nuclei template probe path | 204 matching requests |
+| Known scanner user agent | 8 matching requests (my own tool) |
+| High request rate (300+/min from one client) | peak of 1,211 requests in one minute |
+
+**What I learned:** my first scanner rule looked for "Nuclei" in the user agent and could never match, because Nuclei rotates browser user agents. A behavior-based rule (request rate) catches it even when it hides its name.
+
+**Limitations:**
+- All traffic came from one machine (my laptop), so this proves the pipeline works, not that the rules catch every real attacker.
+- The 300 requests/minute threshold was not tested against normal visitors and needs tuning before real use.
+- The Nuclei path rule depends on a template and can break when templates change.
+cd ~/ai-vuln-scanner
+ls dashboard.png example_report.md sample_report.md requirements.txt
